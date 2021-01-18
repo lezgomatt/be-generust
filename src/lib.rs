@@ -11,8 +11,8 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
     let str_name_pascal = to_pascal_case(&str_name_snake);
 
     let func_name = make_ident(&str_name_snake);
-    let mod_name = make_ident(&(str_name_snake.clone() + "_mod"));
-    let state_enum_name = make_ident(&(str_name_pascal.clone() + "State"));
+    let mod_name = make_ident(&format!("{}_mod", str_name_snake));
+    let state_enum_name = make_ident(&format!("{}State", str_name_pascal));
     let struct_name = make_ident(&str_name_pascal);
 
     let new_code = quote! {
