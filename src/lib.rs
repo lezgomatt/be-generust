@@ -1,8 +1,8 @@
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::quote;
-use syn::{parse_macro_input, ItemFn};
 use syn::spanned::Spanned;
+use syn::{parse_macro_input, ItemFn};
 
 #[proc_macro_attribute]
 pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -10,16 +10,21 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let iter_item_type = match get_iter_item_type(&func.sig.output) {
         Some(ty) => ty,
-        None => return fail(&func.sig.output, "return type must be impl Iterator<Item = XXX>")
+        None => {
+            return fail(
+                &func.sig.output,
+                "return type must be impl Iterator<Item = XXX>",
+            )
+        }
     };
 
-    let str_name_snake = func.sig.ident.to_string();
-    let str_name_pascal = to_pascal_case(&str_name_snake);
+    let name_snake = func.sig.ident.to_string();
+    let name_pascal = to_pascal_case(&name_snake);
 
-    let func_name = make_ident(&str_name_snake);
-    let mod_name = make_ident(&format!("{}_mod", str_name_snake));
-    let state_enum_name = make_ident(&format!("{}State", str_name_pascal));
-    let struct_name = make_ident(&str_name_pascal);
+    let func_name = make_ident(&name_snake);
+    let mod_name = make_ident(&format!("{}_mod", name_snake));
+    let state_enum_name = make_ident(&format!("{}State", name_pascal));
+    let struct_name = make_ident(&name_pascal);
 
     let new_code = quote! {
         mod #mod_name {
@@ -78,47 +83,47 @@ fn to_pascal_case(snake_case_str: &str) -> String {
 fn get_iter_item_type<'a>(ret_type: &'a syn::ReturnType) -> Option<&'a syn::Type> {
     let boxed_type = match ret_type {
         syn::ReturnType::Type(_, bt) => bt,
-        _ => return None
+        _ => return None,
     };
 
     let impl_trait = match &**boxed_type {
         syn::Type::ImplTrait(it) => it,
-        _ => return None
+        _ => return None,
     };
 
     if impl_trait.bounds.len() != 1 {
-        return None
+        return None;
     }
 
     let trait_bound = match &impl_trait.bounds[0] {
         syn::TypeParamBound::Trait(tb) => tb,
-        _ => return None
+        _ => return None,
     };
 
     if trait_bound.path.segments.len() != 1 {
-        return None
+        return None;
     }
 
     if trait_bound.path.segments[0].ident.to_string() != "Iterator" {
-        return None
+        return None;
     }
 
     let generic_args = match &trait_bound.path.segments[0].arguments {
         syn::PathArguments::AngleBracketed(ga) => ga,
-        _ => return None
+        _ => return None,
     };
 
     if generic_args.args.len() != 1 {
-        return None
+        return None;
     }
 
     let binding = match &generic_args.args[0] {
         syn::GenericArgument::Binding(b) => b,
-        _ => return None
+        _ => return None,
     };
 
     if binding.ident.to_string() != "Item" {
-        return None
+        return None;
     }
 
     Some(&binding.ty)
@@ -132,5 +137,5 @@ fn fail<T: Spanned>(s: &T, msg: &str) -> TokenStream {
     let msg = format!("[generoust] {}", msg);
     let err = syn::Error::new(s.span(), msg).to_compile_error();
 
-    return TokenStream::from(err);
+    TokenStream::from(err)
 }
