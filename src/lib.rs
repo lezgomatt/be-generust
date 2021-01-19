@@ -30,7 +30,7 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
         mod #mod_name {
             enum #state_enum_name { Start, Done }
 
-            pub struct #struct_name {
+            struct #struct_name {
                 state: #state_enum_name,
             }
 
@@ -52,7 +52,7 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
                 }
             }
 
-            pub fn #func_name() -> #struct_name {
+            pub fn #func_name() -> impl Iterator<Item = #iter_item_type> {
                 #struct_name { state: #state_enum_name::Start }
             }
         }
