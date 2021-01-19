@@ -13,7 +13,7 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
         None => {
             return fail(
                 &func.sig.output,
-                "return type must be impl Iterator<Item = XXX>",
+                "return type must be `-> impl Iterator<Item = XXX>`",
             )
         }
     };
@@ -80,48 +80,54 @@ fn to_pascal_case(snake_case_str: &str) -> String {
     return result;
 }
 
-fn get_iter_item_type<'a>(ret_type: &'a syn::ReturnType) -> Option<&'a syn::Type> {
-    let boxed_type = match ret_type {
-        syn::ReturnType::Type(_, bt) => bt,
-        _ => return None,
+macro_rules! must_match {
+    ($e:expr, $p:pat, $r:expr) => {
+        match $e {
+            $p => $r,
+            _ => return None,
+        }
     };
+}
 
-    let impl_trait = match &**boxed_type {
-        syn::Type::ImplTrait(it) => it,
-        _ => return None,
+macro_rules! sole_elem {
+    ($e:expr) => {
+        if $e.len() == 1 {
+            &$e[0]
+        } else {
+            return None;
+        }
     };
+}
 
-    if impl_trait.bounds.len() != 1 {
+fn get_iter_item_type(ret_type: &syn::ReturnType) -> Option<&syn::Type> {
+    let boxed_type = must_match!(ret_type, syn::ReturnType::Type(_, bt), bt);
+
+    // impl Iterator<Item = XXX>
+    let impl_bound = must_match!(
+        &**boxed_type,
+        syn::Type::ImplTrait(it),
+        sole_elem!(it.bounds)
+    );
+
+    // Iterator<Item = XXX>
+    let trait_segment = must_match!(
+        impl_bound,
+        syn::TypeParamBound::Trait(tb),
+        sole_elem!(tb.path.segments)
+    );
+    if trait_segment.ident.to_string() != "Iterator" {
         return None;
     }
 
-    let trait_bound = match &impl_trait.bounds[0] {
-        syn::TypeParamBound::Trait(tb) => tb,
-        _ => return None,
-    };
+    // <Item = XXX>
+    let generic_arg = must_match!(
+        &trait_segment.arguments,
+        syn::PathArguments::AngleBracketed(ga),
+        sole_elem!(ga.args)
+    );
 
-    if trait_bound.path.segments.len() != 1 {
-        return None;
-    }
-
-    if trait_bound.path.segments[0].ident.to_string() != "Iterator" {
-        return None;
-    }
-
-    let generic_args = match &trait_bound.path.segments[0].arguments {
-        syn::PathArguments::AngleBracketed(ga) => ga,
-        _ => return None,
-    };
-
-    if generic_args.args.len() != 1 {
-        return None;
-    }
-
-    let binding = match &generic_args.args[0] {
-        syn::GenericArgument::Binding(b) => b,
-        _ => return None,
-    };
-
+    // Item = XXX
+    let binding = must_match!(&generic_arg, syn::GenericArgument::Binding(b), b);
     if binding.ident.to_string() != "Item" {
         return None;
     }
