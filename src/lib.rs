@@ -2,10 +2,16 @@ use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::quote;
 use syn::{parse_macro_input, ItemFn};
+use syn::spanned::Spanned;
 
 #[proc_macro_attribute]
 pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
     let func = parse_macro_input!(item as ItemFn);
+
+    let iter_item_type = match get_iter_item_type(&func.sig.output) {
+        Some(ty) => ty,
+        None => return fail(&func.sig.output, "return type must be impl Iterator<Item = XXX>")
+    };
 
     let str_name_snake = func.sig.ident.to_string();
     let str_name_pascal = to_pascal_case(&str_name_snake);
@@ -24,9 +30,9 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
 
             impl Iterator for #struct_name {
-                type Item = i64;
+                type Item = #iter_item_type;
 
-                fn next(&mut self) -> Option<i64> {
+                fn next(&mut self) -> Option<#iter_item_type> {
                     loop {
                         match self.state {
                             #state_enum_name::Start => {
@@ -69,6 +75,62 @@ fn to_pascal_case(snake_case_str: &str) -> String {
     return result;
 }
 
+fn get_iter_item_type<'a>(ret_type: &'a syn::ReturnType) -> Option<&'a syn::Type> {
+    let boxed_type = match ret_type {
+        syn::ReturnType::Type(_, bt) => bt,
+        _ => return None
+    };
+
+    let impl_trait = match &**boxed_type {
+        syn::Type::ImplTrait(it) => it,
+        _ => return None
+    };
+
+    if impl_trait.bounds.len() != 1 {
+        return None
+    }
+
+    let trait_bound = match &impl_trait.bounds[0] {
+        syn::TypeParamBound::Trait(tb) => tb,
+        _ => return None
+    };
+
+    if trait_bound.path.segments.len() != 1 {
+        return None
+    }
+
+    if trait_bound.path.segments[0].ident.to_string() != "Iterator" {
+        return None
+    }
+
+    let generic_args = match &trait_bound.path.segments[0].arguments {
+        syn::PathArguments::AngleBracketed(ga) => ga,
+        _ => return None
+    };
+
+    if generic_args.args.len() != 1 {
+        return None
+    }
+
+    let binding = match &generic_args.args[0] {
+        syn::GenericArgument::Binding(b) => b,
+        _ => return None
+    };
+
+    if binding.ident.to_string() != "Item" {
+        return None
+    }
+
+    Some(&binding.ty)
+}
+
 fn make_ident(str: &str) -> Ident {
     Ident::new(str, Span::call_site())
+}
+
+fn fail<T: Spanned>(s: &T, msg: &str) -> TokenStream {
+    let msg = format!("[generoust] {}", msg);
+    let err = syn::Error::new(s.span(), msg).to_compile_error();
+
+    return TokenStream::from(err);
 }
