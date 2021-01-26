@@ -107,18 +107,20 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
     let state_enum_name = make_ident(&format!("{}State", name_pascal));
     let struct_name = make_ident(&name_pascal);
 
-    let mut w = new_walker(format!("{}State", name_pascal));
-    walk_fn_body(&mut w, &func.block.stmts);
-    for ((_, s), b) in &w.output {
-        println!("{}:", s);
-        for st in b {
-            println!("  {}", st.to_token_stream());
+    let state_idents = w.states.iter().map(|s| make_ident(&s));
+    let match_blocks = w.output.iter().map(|((_, s), b)| {
+        let state_enum = make_ident(&w.name);
+        let state_id = make_ident(&s);
+        quote! {
+            #state_enum::#state_id => {
+                #(#b)*
+            },
         }
-    }
+    });
 
     let new_code = quote! {
         mod #mod_name {
-            enum #state_enum_name { Start, Done }
+            enum #state_enum_name { #(#state_idents),* }
 
             struct #struct_name {
                 state: #state_enum_name,
@@ -130,20 +132,14 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
                 fn next(&mut self) -> Option<#iter_item_type> {
                     loop {
                         match self.state {
-                            #state_enum_name::Start => {
-                                self.state = #state_enum_name::Done;
-                                return Some(1);
-                            },
-                            #state_enum_name::Done => {
-                                return None
-                            },
+                            #(#match_blocks)*
                         }
                     }
                 }
             }
 
             pub fn #func_name() -> impl Iterator<Item = #iter_item_type> {
-                #struct_name { state: #state_enum_name::Start }
+                #struct_name { state: #state_enum_name::S0_Start }
             }
         }
 
