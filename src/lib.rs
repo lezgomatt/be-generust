@@ -1,8 +1,89 @@
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
-use quote::quote;
+use quote::{quote, ToTokens};
+use std::collections::BTreeMap;
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, ItemFn};
+use syn::{parse_macro_input, parse_quote, Expr, ItemFn, Stmt};
+
+struct Walker {
+    name: String,
+    states: Vec<String>,
+    output: BTreeMap<(usize, String), Vec<Stmt>>,
+}
+
+fn new_walker(name: String) -> Walker {
+    let start_state = "S0_Start".to_string();
+
+    let mut states = Vec::new();
+    states.push(start_state.clone());
+
+    let mut output = BTreeMap::new();
+    output.insert((0, start_state), Vec::new());
+
+    Walker {
+        name,
+        states,
+        output,
+    }
+}
+
+fn walk_fn_body(w: &mut Walker, body: &Vec<Stmt>) {
+    for s in body {
+        match s {
+            Stmt::Semi(e, _) => match e {
+                Expr::Macro(mac_expr) => {
+                    if !mac_expr.mac.path.is_ident("give") {
+                        panic!("Unsupported");
+                    }
+
+                    let curr_state = w.states.last().unwrap().clone();
+                    let num_states = w.states.len();
+                    let next_state = format!("S{}_{}", num_states, "AFTER_GIVE");
+                    w.states.push(next_state.clone());
+                    w.output
+                        .insert((num_states, next_state.clone()), Vec::new());
+
+                    let state_enum = make_ident(&w.name);
+                    let state_id = make_ident(&next_state);
+                    let give_expr = &mac_expr.mac.tokens;
+
+                    let assign: Stmt = parse_quote! { self.state = #state_enum::#state_id; };
+                    let ret: Stmt = parse_quote! { return Some(#give_expr); };
+
+                    let block = w
+                        .output
+                        .get_mut(&(num_states - 1, curr_state.clone()))
+                        .unwrap();
+                    block.push(assign);
+                    block.push(ret);
+                }
+                _ => panic!("Unsupported"),
+            },
+            Stmt::Local(_) | Stmt::Item(_) | Stmt::Expr(_) => panic!("Unsupported"),
+        }
+    }
+
+    let curr_state = w.states.last().unwrap().clone();
+    let num_states = w.states.len();
+    let next_state = format!("S{}_End", num_states);
+    w.states.push(next_state.clone());
+    w.output
+        .insert((num_states, next_state.clone()), Vec::new());
+
+    let state_enum = make_ident(&w.name);
+    let state_id = make_ident(&next_state);
+
+    let assign: Stmt = parse_quote! { self.state = #state_enum::#state_id; };
+    let curr_block = w
+        .output
+        .get_mut(&(num_states - 1, curr_state.clone()))
+        .unwrap();
+    curr_block.push(assign);
+
+    let ret: Stmt = parse_quote! { return None; };
+    let next_block = w.output.get_mut(&(num_states, next_state.clone())).unwrap();
+    next_block.push(ret);
+}
 
 #[proc_macro_attribute]
 pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -25,6 +106,15 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mod_name = make_ident(&format!("{}_mod", name_snake));
     let state_enum_name = make_ident(&format!("{}State", name_pascal));
     let struct_name = make_ident(&name_pascal);
+
+    let mut w = new_walker(format!("{}State", name_pascal));
+    walk_fn_body(&mut w, &func.block.stmts);
+    for ((_, s), b) in &w.output {
+        println!("{}:", s);
+        for st in b {
+            println!("  {}", st.to_token_stream());
+        }
+    }
 
     let new_code = quote! {
         mod #mod_name {
