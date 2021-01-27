@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
-use quote::{quote, ToTokens};
+use quote::quote;
 use std::collections::BTreeMap;
 use syn::spanned::Spanned;
 use syn::{parse_macro_input, parse_quote, Expr, ItemFn, Stmt};
@@ -107,6 +107,8 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
     let state_enum_name = make_ident(&format!("{}State", name_pascal));
     let struct_name = make_ident(&name_pascal);
 
+    let mut w = new_walker(format!("{}State", name_pascal));
+    walk_fn_body(&mut w, &func.block.stmts);
     let state_idents = w.states.iter().map(|s| make_ident(&s));
     let match_blocks = w.output.iter().map(|((_, s), b)| {
         let state_enum = make_ident(&w.name);
