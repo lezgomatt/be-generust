@@ -63,7 +63,6 @@ fn walk_fn_body(w: &mut Walker, body: &Vec<Stmt>) {
         }
     }
 
-    let curr_state = w.states.last().unwrap().clone();
     let num_states = w.states.len();
     let next_state = format!("S{}_End", num_states);
     w.states.push(next_state.clone());
@@ -72,13 +71,6 @@ fn walk_fn_body(w: &mut Walker, body: &Vec<Stmt>) {
 
     let state_enum = make_ident(&w.name);
     let state_id = make_ident(&next_state);
-
-    let assign: Stmt = parse_quote! { self.state = #state_enum::#state_id; };
-    let curr_block = w
-        .output
-        .get_mut(&(num_states - 1, curr_state.clone()))
-        .unwrap();
-    curr_block.push(assign);
 
     let ret: Stmt = parse_quote! { return None; };
     let next_block = w.output.get_mut(&(num_states, next_state.clone())).unwrap();
@@ -113,10 +105,17 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
     let match_blocks = w.output.iter().map(|((_, s), b)| {
         let state_enum = make_ident(&w.name);
         let state_id = make_ident(&s);
-        quote! {
-            #state_enum::#state_id => {
-                #(#b)*
-            },
+
+        if b.is_empty() {
+            quote! {
+                #state_enum::#state_id |
+            }
+        } else {
+            quote! {
+                #state_enum::#state_id => {
+                    #(#b)*
+                },
+            }
         }
     });
 
