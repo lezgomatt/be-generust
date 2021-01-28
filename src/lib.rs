@@ -7,7 +7,7 @@ use syn::spanned::Spanned;
 use syn::{parse_macro_input, ItemFn};
 
 use utils::{get_iter_item_type, make_ident, to_pascal_case};
-use walker::{new_walker, walk_fn_body};
+use walker::Walker;
 
 #[proc_macro_attribute]
 pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -31,8 +31,8 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
     let state_enum_name = make_ident(&format!("{}State", name_pascal));
     let struct_name = make_ident(&name_pascal);
 
-    let mut w = new_walker(format!("{}State", name_pascal));
-    walk_fn_body(&mut w, &func.block.stmts);
+    let mut w = Walker::new(format!("{}State", name_pascal));
+    w.walk_fn_body(&func.block.stmts);
     let state_idents = w.states.iter().map(|s| make_ident(&s));
     let match_blocks = w.output.iter().map(|((_, s), b)| {
         let state_enum = make_ident(&w.name);
