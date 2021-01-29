@@ -14,7 +14,7 @@ pub(crate) fn to_pascal_case(snake_case_str: &str) -> String {
 pub(crate) fn make_ident(str: &str) -> proc_macro2::Ident {
     use proc_macro2::{Ident, Span};
 
-    Ident::new(str, Span::call_site())
+    return Ident::new(str, Span::call_site());
 }
 
 macro_rules! must_match {
@@ -69,5 +69,5 @@ pub(crate) fn get_iter_item_type(ret_type: &syn::ReturnType) -> Option<&syn::Typ
         return None;
     }
 
-    Some(&binding.ty)
+    return Some(&binding.ty);
 }

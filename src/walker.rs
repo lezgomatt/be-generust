@@ -11,19 +11,27 @@ pub(crate) struct Walker {
 
 impl Walker {
     pub fn new(name: String) -> Walker {
-        let start_state = "S0_Start".to_string();
-
-        let mut states = Vec::new();
-        states.push(start_state.clone());
-
-        let mut output = BTreeMap::new();
-        output.insert((0, start_state), Vec::new());
-
-        Walker {
+        let mut w = Walker {
             name,
-            states,
-            output,
-        }
+            states: Vec::new(),
+            output: BTreeMap::new(),
+        };
+
+        w.add_state("Start");
+
+        return w;
+    }
+
+    pub fn add_state(&mut self, name: &str) -> (usize, String) {
+        let num_states = self.states.len();
+
+        let new_state = format!("S{}_{}", num_states, name);
+
+        self.states.push(new_state.clone());
+        self.output
+            .insert((num_states, new_state.clone()), Vec::new());
+
+        return (num_states, new_state);
     }
 
     pub fn walk_fn_body(&mut self, body: &Vec<Stmt>) {
@@ -36,11 +44,7 @@ impl Walker {
                         }
 
                         let curr_state = self.states.last().unwrap().clone();
-                        let num_states = self.states.len();
-                        let next_state = format!("S{}_{}", num_states, "AFTER_GIVE");
-                        self.states.push(next_state.clone());
-                        self.output
-                            .insert((num_states, next_state.clone()), Vec::new());
+                        let (num_states, next_state) = self.add_state("AfterGive");
 
                         let state_enum = make_ident(&self.name);
                         let state_id = make_ident(&next_state);
@@ -62,14 +66,7 @@ impl Walker {
             }
         }
 
-        let num_states = self.states.len();
-        let next_state = format!("S{}_End", num_states);
-        self.states.push(next_state.clone());
-        self.output
-            .insert((num_states, next_state.clone()), Vec::new());
-
-        let state_enum = make_ident(&self.name);
-        let state_id = make_ident(&next_state);
+        let (num_states, next_state) = self.add_state("End");
 
         let ret: Stmt = parse_quote! { return None; };
         let next_block = self
