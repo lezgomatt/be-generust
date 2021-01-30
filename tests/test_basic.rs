@@ -3,6 +3,14 @@ extern crate generoust;
 use generoust::giver;
 
 #[giver]
+fn empty() -> impl Iterator<Item = i64> {}
+
+#[test]
+fn test_empty() {
+    assert_eq!(empty().collect::<Vec<_>>(), vec![]);
+}
+
+#[giver]
 fn single() -> impl Iterator<Item = i64> {
     give!(1);
 }
