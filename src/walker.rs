@@ -10,19 +10,19 @@ pub(crate) struct Walker {
 }
 
 impl Walker {
-    pub fn new(name: String) -> Walker {
+    pub fn walk(name: String, body: &Vec<Stmt>) -> Walker {
         let mut w = Walker {
             name,
             states: Vec::new(),
             output: BTreeMap::new(),
         };
 
-        w.add_state("Start");
+        w.walk_fn_body(body);
 
         return w;
     }
 
-    pub fn add_state(&mut self, name: &str) -> (usize, String) {
+    fn add_state(&mut self, name: &str) -> (usize, String) {
         let num_states = self.states.len();
 
         let new_state = format!("S{}_{}", num_states, name);
@@ -34,7 +34,9 @@ impl Walker {
         return (num_states, new_state);
     }
 
-    pub fn walk_fn_body(&mut self, body: &Vec<Stmt>) {
+    fn walk_fn_body(&mut self, body: &Vec<Stmt>) {
+        self.add_state("Start");
+
         for s in body {
             match s {
                 Stmt::Semi(e, _) => match e {

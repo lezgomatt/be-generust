@@ -31,8 +31,7 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
     let state_enum_name = make_ident(&format!("{}State", name_pascal));
     let struct_name = make_ident(&name_pascal);
 
-    let mut w = Walker::new(format!("{}State", name_pascal));
-    w.walk_fn_body(&func.block.stmts);
+    let w = Walker::walk(format!("{}State", name_pascal), &func.block.stmts);
     let state_idents = w.states.iter().map(|s| make_ident(&s));
     let match_blocks = w.output.iter().map(|((_, s), b)| {
         let state_enum = make_ident(&w.name);
