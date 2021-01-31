@@ -42,29 +42,34 @@ impl Walker {
                 Stmt::Semi(e, _) => match e {
                     Expr::Macro(mac_expr) => {
                         if !mac_expr.mac.path.is_ident("give") {
-                            panic!("Unsupported");
+                            self.copy_stmt(s);
+                        } else {
+                            let curr_state = self.states.last().unwrap().clone();
+                            let (num_states, next_state) = self.add_state("AfterGive");
+
+                            let state_enum = make_ident(&self.name);
+                            let state_id = make_ident(&next_state);
+                            let give_expr = &mac_expr.mac.tokens;
+
+                            let assign: Stmt =
+                                parse_quote! { self.state = #state_enum::#state_id; };
+                            let ret: Stmt = parse_quote! { return Some(#give_expr); };
+
+                            let block = self
+                                .output
+                                .get_mut(&(num_states - 1, curr_state.clone()))
+                                .unwrap();
+                            block.push(assign);
+                            block.push(ret);
                         }
-
-                        let curr_state = self.states.last().unwrap().clone();
-                        let (num_states, next_state) = self.add_state("AfterGive");
-
-                        let state_enum = make_ident(&self.name);
-                        let state_id = make_ident(&next_state);
-                        let give_expr = &mac_expr.mac.tokens;
-
-                        let assign: Stmt = parse_quote! { self.state = #state_enum::#state_id; };
-                        let ret: Stmt = parse_quote! { return Some(#give_expr); };
-
-                        let block = self
-                            .output
-                            .get_mut(&(num_states - 1, curr_state.clone()))
-                            .unwrap();
-                        block.push(assign);
-                        block.push(ret);
                     }
-                    _ => panic!("Unsupported"),
+                    _ => {
+                        self.copy_stmt(s);
+                    }
                 },
-                Stmt::Local(_) | Stmt::Item(_) | Stmt::Expr(_) => panic!("Unsupported"),
+                Stmt::Local(_) | Stmt::Item(_) | Stmt::Expr(_) => {
+                    self.copy_stmt(s);
+                }
             }
         }
 
@@ -76,5 +81,12 @@ impl Walker {
             .get_mut(&(num_states, next_state.clone()))
             .unwrap();
         next_block.push(ret);
+    }
+
+    fn copy_stmt(&mut self, stmt: &Stmt) {
+        self.output
+            .get_mut(&(self.states.len() - 1, self.states.last().unwrap().clone()))
+            .unwrap()
+            .push(stmt.clone());
     }
 }
