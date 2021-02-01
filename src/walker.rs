@@ -1,18 +1,19 @@
+use proc_macro2::Ident;
 use std::collections::BTreeMap;
 use syn::{parse_quote, Expr, Stmt};
 
 use crate::utils::make_ident;
 
-type StateKey = (usize, String);
+type StateKey = (usize, Ident);
 
 pub(crate) struct Walker {
-    pub name: String,
-    pub states: Vec<String>,
+    pub name: Ident,
+    pub states: Vec<Ident>,
     pub output: BTreeMap<StateKey, Vec<Stmt>>,
 }
 
 impl Walker {
-    pub fn walk(name: String, body: &Vec<Stmt>) -> Walker {
+    pub fn walk(name: Ident, body: &Vec<Stmt>) -> Walker {
         let mut w = Walker {
             name,
             states: Vec::new(),
@@ -26,7 +27,8 @@ impl Walker {
 
     fn add_state(&mut self, name: &str) -> StateKey {
         let state_num = self.states.len();
-        let new_state = (state_num, format!("S{}_{}", state_num, name));
+        let state_label = make_ident(&format!("S{}_{}", state_num, name));
+        let new_state = (state_num, state_label);
 
         self.states.push(new_state.1.clone());
         self.output.insert(new_state.clone(), Vec::new());
@@ -47,8 +49,8 @@ impl Walker {
                             let curr_state = self.curr_state();
                             let next_state = self.add_state("AfterGive");
 
-                            let state_enum = make_ident(&self.name);
-                            let state_id = make_ident(&next_state.1);
+                            let state_enum = &self.name;
+                            let state_id = &next_state.1;
                             let give_expr = &mac_expr.mac.tokens;
 
                             let assign: Stmt =

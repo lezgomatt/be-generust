@@ -31,19 +31,18 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
     let state_enum_name = make_ident(&format!("{}State", name_pascal));
     let struct_name = make_ident(&name_pascal);
 
-    let w = Walker::walk(format!("{}State", name_pascal), &func.block.stmts);
-    let state_idents = w.states.iter().map(|s| make_ident(&s));
+    let w = Walker::walk(state_enum_name.clone(), &func.block.stmts);
+    let state_idents = &w.states;
     let match_blocks = w.output.iter().map(|((_, s), b)| {
-        let state_enum = make_ident(&w.name);
-        let state_id = make_ident(&s);
+        let state_enum = &w.name;
 
         if b.is_empty() {
             quote! {
-                #state_enum::#state_id |
+                #state_enum::#s |
             }
         } else {
             quote! {
-                #state_enum::#state_id => {
+                #state_enum::#s => {
                     #(#b)*
                 },
             }
