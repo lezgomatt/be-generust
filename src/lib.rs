@@ -23,6 +23,8 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
+    let func_vis = &func.vis;
+
     let name_snake = func.sig.ident.to_string();
     let name_pascal = to_pascal_case(&name_snake);
 
@@ -74,19 +76,19 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         }
 
-        use #mod_name::#func_name;
+        #func_vis use #mod_name::#func_name;
     };
 
     if attr.to_string() == "print" {
         println!("{}", &new_code);
     }
 
-    TokenStream::from(new_code)
+    return TokenStream::from(new_code);
 }
 
 fn fail<T: Spanned>(s: &T, msg: &str) -> TokenStream {
     let msg = format!("[generoust] {}", msg);
     let err = syn::Error::new(s.span(), msg).to_compile_error();
 
-    TokenStream::from(err)
+    return TokenStream::from(err);
 }
