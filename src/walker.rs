@@ -45,21 +45,22 @@ impl Walker {
                     Expr::Macro(mac_expr) => {
                         if !mac_expr.mac.path.is_ident("give") {
                             self.add_stmt(&self.curr_state(), s.clone());
-                        } else {
-                            let curr_state = self.curr_state();
-                            let next_state = self.add_state("AfterGive");
-
-                            let state_enum = &self.name;
-                            let state_id = &next_state.1;
-                            let give_expr = &mac_expr.mac.tokens;
-
-                            let assign: Stmt =
-                                parse_quote! { self.state = #state_enum::#state_id; };
-                            let ret: Stmt = parse_quote! { return Some(#give_expr); };
-
-                            self.add_stmt(&curr_state, assign);
-                            self.add_stmt(&curr_state, ret);
+                            continue;
                         }
+
+                        let curr_state = self.curr_state();
+                        let next_state = self.add_state("AfterGive");
+
+                        self.add_stmt(&curr_state, {
+                            let enom = &self.name;
+                            let label = &next_state.1;
+                            parse_quote! { self.state = #enom::#label; }
+                        });
+
+                        self.add_stmt(&curr_state, {
+                            let give_expr = &mac_expr.mac.tokens;
+                            parse_quote! { return Some(#give_expr); }
+                        });
                     }
                     _ => {
                         self.add_stmt(&self.curr_state(), s.clone());
@@ -72,8 +73,7 @@ impl Walker {
         }
 
         let end_state = self.add_state("End");
-        let ret: Stmt = parse_quote! { return None; };
-        self.add_stmt(&end_state, ret);
+        self.add_stmt(&end_state, parse_quote! { return None; });
     }
 
     fn curr_state(&self) -> StateKey {
