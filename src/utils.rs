@@ -41,8 +41,8 @@ pub(crate) fn get_iter_item_type(ret_type: &syn::ReturnType) -> Option<&syn::Typ
 
     // impl Iterator<Item = XXX>
     let impl_bound = must_match!(
-        &**boxed_type,
-        syn::Type::ImplTrait(it),
+        **boxed_type,
+        syn::Type::ImplTrait(ref it),
         sole_elem!(it.bounds)
     );
 
@@ -58,13 +58,13 @@ pub(crate) fn get_iter_item_type(ret_type: &syn::ReturnType) -> Option<&syn::Typ
 
     // <Item = XXX>
     let generic_arg = must_match!(
-        &trait_segment.arguments,
-        syn::PathArguments::AngleBracketed(ga),
+        trait_segment.arguments,
+        syn::PathArguments::AngleBracketed(ref ga),
         sole_elem!(ga.args)
     );
 
     // Item = XXX
-    let binding = must_match!(&generic_arg, syn::GenericArgument::Binding(b), b);
+    let binding = must_match!(generic_arg, syn::GenericArgument::Binding(ref b), b);
     if binding.ident.to_string() != "Item" {
         return None;
     }
