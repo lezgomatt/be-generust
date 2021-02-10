@@ -44,7 +44,7 @@ impl Walker {
                 Stmt::Semi(e, _) => match e {
                     Expr::Macro(mac_expr) => {
                         if !mac_expr.mac.path.is_ident("give") {
-                            self.add_stmt(&self.curr_state(), s.clone());
+                            self.copy_stmt(s);
                             continue;
                         }
 
@@ -63,17 +63,21 @@ impl Walker {
                         });
                     }
                     _ => {
-                        self.add_stmt(&self.curr_state(), s.clone());
+                        self.copy_stmt(s);
                     }
                 },
                 Stmt::Local(_) | Stmt::Item(_) | Stmt::Expr(_) => {
-                    self.add_stmt(&self.curr_state(), s.clone());
+                    self.copy_stmt(s);
                 }
             }
         }
 
         let end_state = self.add_state("End");
         self.add_stmt(&end_state, parse_quote! { return None; });
+    }
+
+    fn copy_stmt(&mut self, stmt: &Stmt) {
+        self.add_stmt(&self.curr_state(), stmt.clone());
     }
 
     fn curr_state(&self) -> StateKey {
