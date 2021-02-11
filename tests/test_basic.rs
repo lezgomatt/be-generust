@@ -1,6 +1,6 @@
-extern crate generoust;
+extern crate be_generust;
 
-use generoust::giver;
+use be_generust::giver;
 
 #[giver]
 fn empty() -> impl Iterator<Item = i64> {}

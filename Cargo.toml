@@ -1,10 +1,10 @@
 [package]
-name = "generoust"
+name = "be-generust"
 version = "0.1.0"
 authors = ["Matt <lezgomatt@gmail.com>"]
 edition = "2018"
 description = "A procedural macro for writing iterators in Rust"
-repository = "https://github.com/lezgomatt/generoust/"
+repository = "https://github.com/lezgomatt/be-generust/"
 license = "Zlib"
 
 [lib]
