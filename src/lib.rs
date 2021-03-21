@@ -4,7 +4,7 @@ mod walker;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, ItemFn};
+use syn::{parse_macro_input, ItemFn, Signature};
 
 use utils::{get_iter_item_type, make_ident, to_pascal_case};
 use walker::Walker;
@@ -13,15 +13,15 @@ use walker::Walker;
 pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
     let func = parse_macro_input!(item as ItemFn);
 
-    let iter_item_type = match get_iter_item_type(&func.sig.output) {
-        Some(ty) => ty,
-        None => {
-            return fail(
-                &func.sig.output,
-                "return type must be `-> impl Iterator<Item = XXX>`",
-            )
+    let iter_item_type;
+    match check_sig(&func.sig) {
+        Ok(item_type) => {
+            iter_item_type = item_type;
         }
-    };
+        Err(failure) => {
+            return failure;
+        }
+    }
 
     let func_vis = &func.vis;
 
@@ -87,8 +87,43 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 fn fail<T: Spanned>(s: &T, msg: &str) -> TokenStream {
-    let msg = format!("[generoust] {}", msg);
+    let msg = format!("[be_generust] {}", msg);
     let err = syn::Error::new(s.span(), msg).to_compile_error();
 
     return TokenStream::from(err);
+}
+
+fn check_sig(sig: &Signature) -> Result<&syn::Type, TokenStream> {
+    if sig.constness.is_some() {
+        return Err(fail(&sig.constness, "iterator cannot be const"));
+    }
+
+    if sig.asyncness.is_some() {
+        return Err(fail(&sig.asyncness, "iterator cannot be async"));
+    }
+
+    if sig.unsafety.is_some() {
+        return Err(fail(&sig.unsafety, "iterator cannot be unsafe"));
+    }
+
+    if sig.abi.is_some() {
+        return Err(fail(&sig.abi, "iterator cannot be extern"));
+    }
+
+    if sig.variadic.is_some() {
+        return Err(fail(
+            &sig.variadic,
+            "iterator cannot have variadic parameters",
+        ));
+    }
+
+    match get_iter_item_type(&sig.output) {
+        Some(ty) => Ok(ty),
+        None => {
+            return Err(fail(
+                &sig.output,
+                "return type must be `-> impl Iterator<Item = XXX>`",
+            ));
+        }
+    }
 }
