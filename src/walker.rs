@@ -10,6 +10,7 @@ pub(crate) struct Walker {
     pub name: Ident,
     pub states: Vec<Ident>,
     pub output: BTreeMap<StateKey, Vec<Stmt>>,
+    pub params: Vec<Ident>,
 }
 
 impl Walker {
@@ -18,6 +19,7 @@ impl Walker {
             name,
             states: Vec::new(),
             output: BTreeMap::new(),
+            params: Vec::new(),
         };
 
         w.walk_fn_body(body);
@@ -76,8 +78,40 @@ impl Walker {
         self.add_stmt(&end_state, parse_quote! { return None; });
     }
 
+    fn clone_stmt(&self, stmt: &Stmt) -> Stmt {
+        let mut result = stmt.clone();
+
+        match stmt {
+            Stmt::Semi(e, semi) => {
+                result = Stmt::Semi(self.clone_expr(&e), semi.clone());
+            }
+            Stmt::Expr(e) => {
+                result = Stmt::Expr(self.clone_expr(&e));
+            }
+            Stmt::Local(l) => {
+                let mut local = l.clone();
+                match local.init {
+                    None => {}
+                    Some((eq, box_expr)) => {
+                        local.init = Some((
+                            eq.clone(),
+                            Box::new(self.clone_expr(&*box_expr))
+                        ));
+                    }
+                }
+            }
+            Stmt::Item(_) => { }
+        }
+
+        return result;
+    }
+
+    fn clone_expr(&self, expr: &Expr) -> Expr {
+        return expr.clone();
+    }
+
     fn copy_stmt(&mut self, stmt: &Stmt) {
-        self.add_stmt(&self.curr_state(), stmt.clone());
+        self.add_stmt(&self.curr_state(), self.clone_stmt(stmt));
     }
 
     fn curr_state(&self) -> StateKey {
