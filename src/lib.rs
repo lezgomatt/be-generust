@@ -117,6 +117,15 @@ fn check_sig(sig: &Signature) -> Result<&syn::Type, TokenStream> {
         ));
     }
 
+    if let Some(arg) = sig.inputs.first() {
+        if let syn::FnArg::Receiver(_) = arg {
+            return Err(fail(
+                &arg,
+                "iterator cannot have a method receiver (self)",
+            ));
+        }
+    }
+
     match get_iter_item_type(&sig.output) {
         Some(ty) => Ok(ty),
         None => {
