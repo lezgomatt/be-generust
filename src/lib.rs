@@ -15,7 +15,7 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let iter_item_type;
     match check_sig(&func.sig) {
-        Ok(item_type) => {
+        Ok((_params, item_type)) => {
             iter_item_type = item_type;
         }
         Err(failure) => {
@@ -93,7 +93,7 @@ fn fail<T: Spanned>(s: &T, msg: &str) -> TokenStream {
     return TokenStream::from(err);
 }
 
-fn check_sig(sig: &Signature) -> Result<&syn::Type, TokenStream> {
+fn check_sig(sig: &Signature) -> Result<(Vec::<(proc_macro2::Ident, syn::Type)>, syn::Type), TokenStream> {
     if sig.constness.is_some() {
         return Err(fail(&sig.constness, "iterator cannot be const"));
     }
@@ -126,8 +126,40 @@ fn check_sig(sig: &Signature) -> Result<&syn::Type, TokenStream> {
         }
     }
 
+    let mut params = Vec::<(proc_macro2::Ident, syn::Type)>::new();
+
+    for arg in sig.inputs.iter() {
+        if let syn::FnArg::Typed(pat_type) = arg {
+            match &*pat_type.pat {
+                syn::Pat::Ident(pat_ident) => {
+                    if pat_ident.by_ref.is_some() {
+                        return Err(fail(
+                            &pat_ident.by_ref,
+                            "iterator cannot have reference arguments",
+                        ));
+                    }
+
+                    if let Some((_, ref subpat)) = pat_ident.subpat {
+                        return Err(fail(
+                            subpat,
+                            "iterator cannot have argument subpatterns",
+                        ));
+                    }
+
+                    params.push((pat_ident.ident.clone(), (*pat_type.ty).clone()));
+                }
+                _ => {
+                    return Err(fail(
+                        &arg,
+                        "iterator cannot have a pattern arguments",
+                    ));
+                }
+            }
+        }
+    }
+
     match get_iter_item_type(&sig.output) {
-        Some(ty) => Ok(ty),
+        Some(ty) => Ok((params, ty.clone())),
         None => {
             return Err(fail(
                 &sig.output,
