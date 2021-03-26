@@ -14,12 +14,12 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
     let func = parse_macro_input!(item as ItemFn);
 
     let iter_item_type;
-    match check_sig(&func.sig) {
+    match extract_iter_sig(&func.sig) {
         Ok((_params, item_type)) => {
             iter_item_type = item_type;
         }
-        Err(failure) => {
-            return failure;
+        Err((span, message)) => {
+            return fail(span, message);
         }
     }
 
@@ -86,32 +86,32 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
     return TokenStream::from(new_code);
 }
 
-fn fail<T: Spanned>(s: &T, msg: &str) -> TokenStream {
+fn fail<T: Spanned + ?Sized>(s: &T, msg: &str) -> TokenStream {
     let msg = format!("[be_generust] {}", msg);
     let err = syn::Error::new(s.span(), msg).to_compile_error();
 
     return TokenStream::from(err);
 }
 
-fn check_sig(sig: &Signature) -> Result<(Vec::<(proc_macro2::Ident, syn::Type)>, syn::Type), TokenStream> {
+fn extract_iter_sig(sig: &Signature) -> Result<(Vec::<(proc_macro2::Ident, syn::Type)>, syn::Type), (&dyn Spanned, &str)> {
     if sig.constness.is_some() {
-        return Err(fail(&sig.constness, "iterator cannot be const"));
+        return Err((&sig.constness, "iterator cannot be const"));
     }
 
     if sig.asyncness.is_some() {
-        return Err(fail(&sig.asyncness, "iterator cannot be async"));
+        return Err((&sig.asyncness, "iterator cannot be async"));
     }
 
     if sig.unsafety.is_some() {
-        return Err(fail(&sig.unsafety, "iterator cannot be unsafe"));
+        return Err((&sig.unsafety, "iterator cannot be unsafe"));
     }
 
     if sig.abi.is_some() {
-        return Err(fail(&sig.abi, "iterator cannot be extern"));
+        return Err((&sig.abi, "iterator cannot be extern"));
     }
 
     if sig.variadic.is_some() {
-        return Err(fail(
+        return Err((
             &sig.variadic,
             "iterator cannot have variadic parameters",
         ));
@@ -119,8 +119,8 @@ fn check_sig(sig: &Signature) -> Result<(Vec::<(proc_macro2::Ident, syn::Type)>,
 
     if let Some(arg) = sig.inputs.first() {
         if let syn::FnArg::Receiver(_) = arg {
-            return Err(fail(
-                &arg,
+            return Err((
+                arg,
                 "iterator cannot have a method receiver (self)",
             ));
         }
@@ -133,14 +133,14 @@ fn check_sig(sig: &Signature) -> Result<(Vec::<(proc_macro2::Ident, syn::Type)>,
             match &*pat_type.pat {
                 syn::Pat::Ident(pat_ident) => {
                     if pat_ident.by_ref.is_some() {
-                        return Err(fail(
+                        return Err((
                             &pat_ident.by_ref,
                             "iterator cannot have reference arguments",
                         ));
                     }
 
                     if let Some((_, ref subpat)) = pat_ident.subpat {
-                        return Err(fail(
+                        return Err((
                             subpat,
                             "iterator cannot have argument subpatterns",
                         ));
@@ -149,8 +149,8 @@ fn check_sig(sig: &Signature) -> Result<(Vec::<(proc_macro2::Ident, syn::Type)>,
                     params.push((pat_ident.ident.clone(), (*pat_type.ty).clone()));
                 }
                 _ => {
-                    return Err(fail(
-                        &arg,
+                    return Err((
+                        arg,
                         "iterator cannot have a pattern arguments",
                     ));
                 }
@@ -161,7 +161,7 @@ fn check_sig(sig: &Signature) -> Result<(Vec::<(proc_macro2::Ident, syn::Type)>,
     match get_iter_item_type(&sig.output) {
         Some(ty) => Ok((params, ty.clone())),
         None => {
-            return Err(fail(
+            return Err((
                 &sig.output,
                 "return type must be `-> impl Iterator<Item = XXX>`",
             ));
