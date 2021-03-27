@@ -14,9 +14,11 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
     let func = parse_macro_input!(item as ItemFn);
 
     let iter_item_type;
+    let iter_params;
     match extract_iter_sig(&func.sig) {
-        Ok((_params, item_type)) => {
+        Ok((params, item_type)) => {
             iter_item_type = item_type;
+            iter_params = params;
         }
         Err((span, message)) => {
             return fail(span, message);
@@ -51,6 +53,10 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     });
 
+    let new_params = iter_params.iter().map(|(ident, typ)| {
+        quote! { #ident: #typ }
+    });
+
     let new_code = quote! {
         mod #mod_name {
             enum #state_enum_name { #(#state_idents),* }
@@ -71,7 +77,7 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
                 }
             }
 
-            pub fn #func_name() -> impl Iterator<Item = #iter_item_type> {
+            pub fn #func_name(#(#new_params),*) -> impl Iterator<Item = #iter_item_type> {
                 #struct_name { state: #state_enum_name::S0_Start }
             }
         }
