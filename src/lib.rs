@@ -1,12 +1,14 @@
+mod sig;
 mod utils;
 mod walker;
 
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, ItemFn, Signature};
+use syn::{parse_macro_input, ItemFn};
 
-use utils::{get_iter_item_type, make_ident, to_pascal_case};
+use sig::extract_iter_sig;
+use utils::{make_ident, to_pascal_case};
 use walker::Walker;
 
 #[proc_macro_attribute]
@@ -97,80 +99,4 @@ fn fail<T: Spanned + ?Sized>(s: &T, msg: &str) -> TokenStream {
     let err = syn::Error::new(s.span(), msg).to_compile_error();
 
     return TokenStream::from(err);
-}
-
-fn extract_iter_sig(sig: &Signature) -> Result<(Vec::<(proc_macro2::Ident, syn::Type)>, syn::Type), (&dyn Spanned, &str)> {
-    if sig.constness.is_some() {
-        return Err((&sig.constness, "iterator cannot be const"));
-    }
-
-    if sig.asyncness.is_some() {
-        return Err((&sig.asyncness, "iterator cannot be async"));
-    }
-
-    if sig.unsafety.is_some() {
-        return Err((&sig.unsafety, "iterator cannot be unsafe"));
-    }
-
-    if sig.abi.is_some() {
-        return Err((&sig.abi, "iterator cannot be extern"));
-    }
-
-    if sig.variadic.is_some() {
-        return Err((
-            &sig.variadic,
-            "iterator cannot have variadic parameters",
-        ));
-    }
-
-    if let Some(arg) = sig.inputs.first() {
-        if let syn::FnArg::Receiver(_) = arg {
-            return Err((
-                arg,
-                "iterator cannot have a method receiver (self)",
-            ));
-        }
-    }
-
-    let mut params = Vec::<(proc_macro2::Ident, syn::Type)>::new();
-
-    for arg in sig.inputs.iter() {
-        if let syn::FnArg::Typed(pat_type) = arg {
-            match &*pat_type.pat {
-                syn::Pat::Ident(pat_ident) => {
-                    if pat_ident.by_ref.is_some() {
-                        return Err((
-                            &pat_ident.by_ref,
-                            "iterator cannot have reference arguments",
-                        ));
-                    }
-
-                    if let Some((_, ref subpat)) = pat_ident.subpat {
-                        return Err((
-                            subpat,
-                            "iterator cannot have argument subpatterns",
-                        ));
-                    }
-
-                    params.push((pat_ident.ident.clone(), (*pat_type.ty).clone()));
-                }
-                _ => {
-                    return Err((
-                        arg,
-                        "iterator cannot have a pattern arguments",
-                    ));
-                }
-            }
-        }
-    }
-
-    match get_iter_item_type(&sig.output) {
-        Some(ty) => Ok((params, ty.clone())),
-        None => {
-            return Err((
-                &sig.output,
-                "return type must be `-> impl Iterator<Item = XXX>`",
-            ));
-        }
-    }
 }

@@ -93,21 +93,64 @@ impl Walker {
                 match local.init {
                     None => {}
                     Some((eq, box_expr)) => {
-                        local.init = Some((
-                            eq.clone(),
-                            Box::new(self.clone_expr(&*box_expr))
-                        ));
+                        let new_expr = Box::new(self.clone_expr(&*box_expr));
+                        local.init = Some((eq.clone(), new_expr));
                     }
                 }
             }
-            Stmt::Item(_) => { }
+            Stmt::Item(_) => {}
         }
 
         return result;
     }
 
     fn clone_expr(&self, expr: &Expr) -> Expr {
-        return expr.clone();
+        let mut result = expr.clone();
+
+        // match expr {
+        //     Expr::Array(e_array) => {}
+        //     Expr::Assign(e_assign) => {}
+        //     Expr::AssignOp(e_assign_op) => {}
+        //     Expr::Async(e_async) => {}
+        //     Expr::Await(e_await) => {}
+        //     Expr::Binary(e_binary) => {}
+        //     Expr::Block(e_block) => {}
+        //     Expr::Box(e_box) => {}
+        //     Expr::Break(e_break) => {}
+        //     Expr::Call(e_call) => {}
+        //     Expr::Cast(e_cast) => {}
+        //     Expr::Closure(e_closure) => {}
+        //     Expr::Continue(e_continue) => {}
+        //     Expr::Field(e_field) => {}
+        //     Expr::ForLoop(e_for_loop) => {}
+        //     Expr::Group(e_group) => {}
+        //     Expr::If(e_if) => {}
+        //     Expr::Index(e_index) => {}
+        //     Expr::Let(e_let) => {}
+        //     Expr::Lit(e_lit) => {}
+        //     Expr::Loop(e_loop) => {}
+        //     Expr::Macro(e_macro) => {}
+        //     Expr::Match(e_match) => {}
+        //     Expr::MethodCall(e_method_call) => {}
+        //     Expr::Paren(e_paren) => {}
+        //     Expr::Path(e_path) => {}
+        //     Expr::Range(e_range) => {}
+        //     Expr::Reference(e_reference) => {}
+        //     Expr::Repeat(e_repeat) => {}
+        //     Expr::Return(e_return) => {}
+        //     Expr::Struct(e_struct) => {}
+        //     Expr::Try(e_try) => {}
+        //     Expr::TryBlock(e_try_block) => {}
+        //     Expr::Tuple(e_tuple) => {}
+        //     Expr::Type(e_type) => {}
+        //     Expr::Unary(e_unary) => {}
+        //     Expr::Unsafe(e_unsafe) => {}
+        //     Expr::Verbatim(e_verbatim) => {}
+        //     Expr::While(e_while) => {}
+        //     Expr::Yield(e_yield) => {}
+        // }
+
+        return result;
     }
 
     fn copy_stmt(&mut self, stmt: &Stmt) {
