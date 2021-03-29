@@ -23,7 +23,7 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
             iter_params = params;
         }
         Err((span, message)) => {
-            return fail(span, message);
+            return fail(&func, span, message);
         }
     }
 
@@ -94,9 +94,21 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
     return TokenStream::from(new_code);
 }
 
-fn fail<T: Spanned + ?Sized>(s: &T, msg: &str) -> TokenStream {
+fn fail<T: Spanned + ?Sized>(func: &ItemFn, s: &T, msg: &str) -> TokenStream {
     let msg = format!("[be_generust] {}", msg);
     let err = syn::Error::new(s.span(), msg).to_compile_error();
 
-    return TokenStream::from(err);
+    let dummy_vis = &func.vis;
+    let dummy_sig = &func.sig;
+    // We can't just use `unimplemented!()` due to the ff bug:
+    // https://github.com/rust-lang/rust/issues/36375
+    let dummy = quote! {
+        #dummy_vis #dummy_sig { std::iter::empty() }
+    };
+
+    return quote! {
+        #err
+        #dummy
+    }
+    .into();
 }

@@ -8,7 +8,7 @@ macro_rules! forbid_some {
         if $e.is_some() {
             return Err((&$e, $msg));
         }
-    }
+    };
 }
 
 pub(crate) fn extract_iter_sig(sig: &syn::Signature) -> Result<IterSig, (&dyn Spanned, &str)> {
