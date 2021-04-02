@@ -55,8 +55,18 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     });
 
+    let struct_params = iter_params.iter().map(|(ident, typ)| {
+        let field_ident = make_ident(&format!("param_{}", ident.to_string()));
+        quote! { #field_ident: #typ }
+    });
+
     let new_params = iter_params.iter().map(|(ident, typ)| {
         quote! { #ident: #typ }
+    });
+
+    let params_assign = iter_params.iter().map(|(ident, _typ)| {
+        let field_ident = make_ident(&format!("param_{}", ident.to_string()));
+        quote! { #field_ident: #ident }
     });
 
     let new_code = quote! {
@@ -65,6 +75,7 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
 
             struct #struct_name {
                 state: #state_enum_name,
+                #(#struct_params),*
             }
 
             impl Iterator for #struct_name {
@@ -80,7 +91,10 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
 
             pub fn #func_name(#(#new_params),*) -> impl Iterator<Item = #iter_item_type> {
-                #struct_name { state: #state_enum_name::S0_Start }
+                #struct_name {
+                    state: #state_enum_name::S0_Start,
+                    #(#params_assign),*
+                }
             }
         }
 
