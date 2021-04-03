@@ -38,7 +38,22 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
     let struct_name = make_ident(&name_pascal);
 
     let w = Walker::walk(state_enum_name.clone(), &func.block.stmts);
+
     let state_idents = &w.states;
+    let state_enum = quote! { enum #state_enum_name { #(#state_idents),* } };
+
+    let struct_params = iter_params.iter().map(|(ident, typ)| {
+        let field_ident = make_ident(&format!("param_{}", ident.to_string()));
+        quote! { #field_ident: #typ }
+    });
+
+    let iter_struct = quote! {
+        struct #struct_name {
+            state: #state_enum_name,
+            #(#struct_params),*
+        }
+    };
+
     let match_blocks = w.output.iter().map(|((_, s), b)| {
         let state_enum = &w.name;
 
@@ -55,10 +70,13 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     });
 
-    let struct_params = iter_params.iter().map(|(ident, typ)| {
-        let field_ident = make_ident(&format!("param_{}", ident.to_string()));
-        quote! { #field_ident: #typ }
-    });
+    let next_impl = quote! {
+        loop {
+            match self.state {
+                #(#match_blocks)*
+            }
+        }
+    };
 
     let new_params = iter_params.iter().map(|(ident, typ)| {
         quote! { #ident: #typ }
@@ -69,33 +87,29 @@ pub fn giver(attr: TokenStream, item: TokenStream) -> TokenStream {
         quote! { #field_ident: #ident }
     });
 
+    let iter_constructor = quote! {
+        pub fn #func_name(#(#new_params),*) -> impl Iterator<Item = #iter_item_type> {
+            #struct_name {
+                state: #state_enum_name::S0_Start,
+                #(#params_assign),*
+            }
+        }
+    };
+
     let new_code = quote! {
         mod #mod_name {
-            enum #state_enum_name { #(#state_idents),* }
-
-            struct #struct_name {
-                state: #state_enum_name,
-                #(#struct_params),*
-            }
+            #state_enum
+            #iter_struct
 
             impl Iterator for #struct_name {
                 type Item = #iter_item_type;
 
                 fn next(&mut self) -> Option<#iter_item_type> {
-                    loop {
-                        match self.state {
-                            #(#match_blocks)*
-                        }
-                    }
+                    #next_impl
                 }
             }
 
-            pub fn #func_name(#(#new_params),*) -> impl Iterator<Item = #iter_item_type> {
-                #struct_name {
-                    state: #state_enum_name::S0_Start,
-                    #(#params_assign),*
-                }
-            }
+            #iter_constructor
         }
 
         #func_vis use #mod_name::#func_name;
